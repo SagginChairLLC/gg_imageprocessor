@@ -15,7 +15,6 @@ let vehicle_colors = {};
 onNet("receiveConfig", (config) => {
     vehicle_list = config.vehicles;
     vehicle_colors = config.vehicle_colors;
-    console.log(config);
 });
 
 async function takeScreenshotForVehicle(

@@ -7,7 +7,7 @@ version '1.6.5'
 
 this_is_a_map 'yes'
 
-ui_page 'html/index.html'
+ui_page 'core/html/index.html'
 
 shared_scripts {
     'vehicle_list.lua',
@@ -15,15 +15,15 @@ shared_scripts {
 
 files {
     'config.json',
-    'html/*'
+    'core/html/*'
 }
 
 client_script {
-    'client.js',
-    'client.lua',
+    'core/client.js',
+    'core/client.lua',
 }
 
-server_script 'server.js'
+server_script 'core/server.js'
 
 dependencies {
 	'screenshot-basic',
