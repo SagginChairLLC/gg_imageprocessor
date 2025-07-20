@@ -12,16 +12,25 @@ try {
         fs.mkdirSync(mainSavePath);
     }
 
-    onNet("takeScreenshot", async (filename, type) => {
-        const savePath = `${mainSavePath}/${type}`;
+    onNet("takeScreenshot", async (filename, type, color) => {
+        let savePath = `${mainSavePath}/${type}`;
         if (!fs.existsSync(savePath)) {
             fs.mkdirSync(savePath);
         }
 
+        if (typeof filename === "string") {
+            savePath = `${savePath}/${filename}`;
+            if (!fs.existsSync(savePath)) {
+                fs.mkdirSync(savePath);
+            }
+        }
+
+        const finalFilePath = `${savePath}/${color}.png`;
+
         exports["screenshot-basic"].requestClientScreenshot(
             source,
             {
-                fileName: savePath + "/" + filename + ".png",
+                fileName: finalFilePath,
                 encoding: "png",
                 quality: 1.0,
             },
@@ -33,13 +42,10 @@ try {
                     maxX = 0,
                     maxY = 0;
 
-                // Detect vehicle bounds (exclude green/transparent background) with tolerance
                 const greenTolerance = 30;
                 for (let y = 0; y < height; y++) {
                     for (let x = 0; x < width; x++) {
                         const [r, g, b] = image.getPixelXY(x, y);
-
-                        // Relaxed green detection
                         if (!(g > r + b + greenTolerance)) {
                             if (x < minX) minX = x;
                             if (x > maxX) maxX = x;
@@ -49,25 +55,11 @@ try {
                     }
                 }
 
-                console.log(`Original image: ${width}x${height}`);
-                console.log(
-                    `Crop bounds: minX=${minX}, maxX=${maxX}, width=${
-                        maxX - minX + 1
-                    }`
-                );
-                console.log(
-                    `Crop bounds: minY=${minY}, maxY=${maxY}, height=${
-                        maxY - minY + 1
-                    }`
-                );
-
-                // Safety check to avoid invalid crop
                 if (minX >= maxX || minY >= maxY) {
                     console.warn("No vehicle pixels detected for:", fileName);
                     return;
                 }
 
-                // Perform crop
                 const croppedImage = image.crop({
                     x: minX,
                     y: minY,
@@ -75,11 +67,6 @@ try {
                     height: maxY - minY + 1,
                 });
 
-                console.log(
-                    `Cropped image size: ${croppedImage.width}x${croppedImage.height}`
-                );
-
-                // Convert green to transparent
                 for (let y = 0; y < croppedImage.height; y++) {
                     for (let x = 0; x < croppedImage.width; x++) {
                         const [r, g, b] = croppedImage.getPixelXY(x, y);

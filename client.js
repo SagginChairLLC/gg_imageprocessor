@@ -7,178 +7,23 @@ const config = JSON.parse(
 const Delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 let cam;
-let camInfo;
-let ped;
-let interval;
 const playerId = PlayerId();
-let QBCore = null;
 
-if (config.useQBVehicles) {
-    QBCore = exports[config.coreResourceName].GetCoreObject();
-}
+let vehicle_list = {};
+let vehicle_colors = {};
 
-async function takeScreenshotForComponent(
-    pedType,
-    type,
-    component,
-    drawable,
-    texture,
-    cameraSettings
+onNet("receiveConfig", (config) => {
+    vehicle_list = config.vehicles;
+    vehicle_colors = config.vehicle_colors;
+    console.log(config);
+});
+
+async function takeScreenshotForVehicle(
+    vehicle,
+    hash,
+    model,
+    primaryColor = 0
 ) {
-    const cameraInfo = cameraSettings
-        ? cameraSettings
-        : config.cameraSettings[type][component];
-
-    setWeatherTime();
-
-    await Delay(500);
-
-    if (
-        !camInfo ||
-        camInfo.zPos !== cameraInfo.zPos ||
-        camInfo.fov !== cameraInfo.fov
-    ) {
-        camInfo = cameraInfo;
-
-        if (cam) {
-            DestroyAllCams(true);
-            DestroyCam(cam, true);
-            cam = null;
-        }
-
-        SetEntityRotation(
-            ped,
-            config.greenScreenRotation.x,
-            config.greenScreenRotation.y,
-            config.greenScreenRotation.z,
-            0,
-            false
-        );
-        SetEntityCoordsNoOffset(
-            ped,
-            config.greenScreenPosition.x,
-            config.greenScreenPosition.y,
-            config.greenScreenPosition.z,
-            false,
-            false,
-            false
-        );
-
-        await Delay(50);
-
-        const [playerX, playerY, playerZ] = GetEntityCoords(ped);
-        const [fwdX, fwdY, fwdZ] = GetEntityForwardVector(ped);
-
-        const fwdPos = {
-            x: playerX + fwdX * 1.2,
-            y: playerY + fwdY * 1.2,
-            z: playerZ + fwdZ + camInfo.zPos,
-        };
-
-        cam = CreateCamWithParams(
-            "DEFAULT_SCRIPTED_CAMERA",
-            fwdPos.x,
-            fwdPos.y,
-            fwdPos.z,
-            0,
-            0,
-            0,
-            camInfo.fov,
-            true,
-            0
-        );
-
-        PointCamAtCoord(cam, playerX, playerY, playerZ + camInfo.zPos);
-        SetCamActive(cam, true);
-        RenderScriptCams(true, false, 0, true, false, 0);
-    }
-
-    await Delay(50);
-
-    SetEntityRotation(
-        ped,
-        camInfo.rotation.x,
-        camInfo.rotation.y,
-        camInfo.rotation.z,
-        2,
-        false
-    );
-
-    emitNet(
-        "takeScreenshot",
-        `${pedType}_${type == "PROPS" ? "prop_" : ""}${component}_${drawable}${
-            texture ? `_${texture}` : ""
-        }`,
-        "clothing"
-    );
-    await Delay(2000);
-    return;
-}
-
-async function takeScreenshotForObject(object, hash) {
-    setWeatherTime();
-
-    await Delay(500);
-
-    if (cam) {
-        DestroyAllCams(true);
-        DestroyCam(cam, true);
-        cam = null;
-    }
-
-    let [[minDimX, minDimY, minDimZ], [maxDimX, maxDimY, maxDimZ]] =
-        GetModelDimensions(hash);
-    let modelSize = {
-        x: maxDimX - minDimX,
-        y: maxDimY - minDimY,
-        z: maxDimZ - minDimZ,
-    };
-    let fov = Math.min((Math.max(modelSize.x, modelSize.z) / 0.15) * 10, 60);
-
-    const [objectX, objectY, objectZ] = GetEntityCoords(object, false);
-    const [fwdX, fwdY, fwdZ] = GetEntityForwardVector(object);
-
-    const center = {
-        x: objectX + (minDimX + maxDimX) / 2,
-        y: objectY + (minDimY + maxDimY) / 2,
-        z: objectZ + (minDimZ + maxDimZ) / 2,
-    };
-
-    const fwdPos = {
-        x: center.x + fwdX * 1.2 + Math.max(modelSize.x, modelSize.z) / 2,
-        y: center.y + fwdY * 1.2 + Math.max(modelSize.x, modelSize.z) / 2,
-        z: center.z + fwdZ,
-    };
-
-    console.log(modelSize.x, modelSize.z);
-
-    cam = CreateCamWithParams(
-        "DEFAULT_SCRIPTED_CAMERA",
-        fwdPos.x,
-        fwdPos.y,
-        fwdPos.z,
-        0,
-        0,
-        0,
-        fov,
-        true,
-        0
-    );
-
-    PointCamAtCoord(cam, center.x, center.y, center.z);
-    SetCamActive(cam, true);
-    RenderScriptCams(true, false, 0, true, false, 0);
-
-    await Delay(50);
-
-    emitNet("takeScreenshot", `${hash}`, "objects");
-
-    await Delay(2000);
-
-    return;
-}
-
-async function takeScreenshotForVehicle(vehicle, hash, model) {
     setWeatherTime();
 
     await Delay(500);
@@ -238,46 +83,9 @@ async function takeScreenshotForVehicle(vehicle, hash, model) {
 
     await Delay(50);
 
-    emitNet("takeScreenshot", `${model}`, "vehicles");
+    emitNet("takeScreenshot", `${model}`, "vehicles", parseInt(primaryColor));
 
     await Delay(2000);
-
-    return;
-}
-
-function SetPedOnGround() {
-    const [x, y, z] = GetEntityCoords(ped, false);
-    const [retval, ground] = GetGroundZFor_3dCoord(x, y, z, 0, false);
-    SetEntityCoords(ped, x, y, ground, false, false, false, false);
-}
-
-function ClearAllPedProps() {
-    for (const prop of Object.keys(config.cameraSettings.PROPS)) {
-        ClearPedProp(ped, parseInt(prop));
-    }
-}
-
-async function ResetPedComponents() {
-    if (config.debug) console.log(`DEBUG: Resetting Ped Components`);
-
-    SetPedDefaultComponentVariation(ped);
-
-    await Delay(150);
-
-    SetPedComponentVariation(ped, 0, 0, 1, 0); // Head
-    SetPedComponentVariation(ped, 1, 0, 0, 0); // Mask
-    SetPedComponentVariation(ped, 2, -1, 0, 0); // Hair
-    SetPedComponentVariation(ped, 7, 0, 0, 0); // Accessories
-    SetPedComponentVariation(ped, 5, 0, 0, 0); // Bags
-    SetPedComponentVariation(ped, 6, -1, 0, 0); // Shoes
-    SetPedComponentVariation(ped, 9, 0, 0, 0); // Armor
-    SetPedComponentVariation(ped, 3, -1, 0, 0); // Torso
-    SetPedComponentVariation(ped, 8, -1, 0, 0); // Undershirt
-    SetPedComponentVariation(ped, 4, -1, 0, 0); // Legs
-    SetPedComponentVariation(ped, 11, -1, 0, 0); // Top
-    SetPedHairColor(ped, 45, 15);
-
-    ClearAllPedProps();
 
     return;
 }
@@ -340,41 +148,6 @@ function startWeatherResource() {
     }
 }
 
-async function LoadComponentVariation(ped, component, drawable, texture) {
-    texture = texture || 0;
-
-    if (config.debug)
-        console.log(
-            `DEBUG: Loading Component Variation: ${component} ${drawable} ${texture}`
-        );
-
-    SetPedPreloadVariationData(ped, component, drawable, texture);
-    while (!HasPedPreloadVariationDataFinished(ped)) {
-        await Delay(50);
-    }
-    SetPedComponentVariation(ped, component, drawable, texture, 0);
-
-    return;
-}
-
-async function LoadPropVariation(ped, component, prop, texture) {
-    texture = texture || 0;
-
-    if (config.debug)
-        console.log(
-            `DEBUG: Loading Prop Variation: ${component} ${prop} ${texture}`
-        );
-
-    SetPedPreloadPropData(ped, component, prop, texture);
-    while (!HasPedPreloadPropDataFinished(ped)) {
-        await Delay(50);
-    }
-    ClearPedProp(ped, component);
-    SetPedPropIndex(ped, component, prop, texture, 0);
-
-    return;
-}
-
 function createGreenScreenVehicle(vehicleHash, vehicleModel) {
     return new Promise(async (resolve, reject) => {
         if (config.debug)
@@ -406,583 +179,7 @@ function createGreenScreenVehicle(vehicleHash, vehicleModel) {
     });
 }
 
-RegisterCommand("screenshot", async (source, args) => {
-    const modelHashes = [
-        GetHashKey("mp_m_freemode_01"),
-        GetHashKey("mp_f_freemode_01"),
-    ];
-
-    SendNUIMessage({
-        start: true,
-    });
-
-    if (!stopWeatherResource()) return;
-
-    DisableIdleCamera(true);
-
-    await Delay(100);
-
-    for (const modelHash of modelHashes) {
-        if (IsModelValid(modelHash)) {
-            if (!HasModelLoaded(modelHash)) {
-                RequestModel(modelHash);
-                while (!HasModelLoaded(modelHash)) {
-                    await Delay(100);
-                }
-            }
-
-            SetPlayerModel(playerId, modelHash);
-            await Delay(150);
-            SetModelAsNoLongerNeeded(modelHash);
-
-            await Delay(150);
-
-            ped = PlayerPedId();
-
-            const pedType =
-                modelHash === GetHashKey("mp_m_freemode_01")
-                    ? "male"
-                    : "female";
-            SetEntityRotation(
-                ped,
-                config.greenScreenRotation.x,
-                config.greenScreenRotation.y,
-                config.greenScreenRotation.z,
-                0,
-                false
-            );
-            SetEntityCoordsNoOffset(
-                ped,
-                config.greenScreenPosition.x,
-                config.greenScreenPosition.y,
-                config.greenScreenPosition.z,
-                false,
-                false,
-                false
-            );
-            FreezeEntityPosition(ped, true);
-            await Delay(50);
-            SetPlayerControl(playerId, false);
-
-            interval = setInterval(() => {
-                ClearPedTasksImmediately(ped);
-            }, 1);
-
-            for (const type of Object.keys(config.cameraSettings)) {
-                for (const stringComponent of Object.keys(
-                    config.cameraSettings[type]
-                )) {
-                    await ResetPedComponents();
-                    await Delay(150);
-                    const component = parseInt(stringComponent);
-                    if (type === "CLOTHING") {
-                        const drawableVariationCount =
-                            GetNumberOfPedDrawableVariations(ped, component);
-                        for (
-                            let drawable = 0;
-                            drawable < drawableVariationCount;
-                            drawable++
-                        ) {
-                            const textureVariationCount =
-                                GetNumberOfPedTextureVariations(
-                                    ped,
-                                    component,
-                                    drawable
-                                );
-                            SendNUIMessage({
-                                type: config.cameraSettings[type][component]
-                                    .name,
-                                value: drawable,
-                                max: drawableVariationCount,
-                            });
-                            if (config.includeTextures) {
-                                for (
-                                    let texture = 0;
-                                    texture < textureVariationCount;
-                                    texture++
-                                ) {
-                                    await LoadComponentVariation(
-                                        ped,
-                                        component,
-                                        drawable,
-                                        texture
-                                    );
-                                    await takeScreenshotForComponent(
-                                        pedType,
-                                        type,
-                                        component,
-                                        drawable,
-                                        texture
-                                    );
-                                }
-                            } else {
-                                await LoadComponentVariation(
-                                    ped,
-                                    component,
-                                    drawable
-                                );
-                                await takeScreenshotForComponent(
-                                    pedType,
-                                    type,
-                                    component,
-                                    drawable
-                                );
-                            }
-                        }
-                    } else if (type === "PROPS") {
-                        const propVariationCount =
-                            GetNumberOfPedPropDrawableVariations(
-                                ped,
-                                component
-                            );
-                        for (let prop = 0; prop < propVariationCount; prop++) {
-                            const textureVariationCount =
-                                GetNumberOfPedPropTextureVariations(
-                                    ped,
-                                    component,
-                                    prop
-                                );
-                            SendNUIMessage({
-                                type: config.cameraSettings[type][component]
-                                    .name,
-                                value: prop,
-                                max: propVariationCount,
-                            });
-
-                            if (config.includeTextures) {
-                                for (
-                                    let texture = 0;
-                                    texture < textureVariationCount;
-                                    texture++
-                                ) {
-                                    await LoadPropVariation(
-                                        ped,
-                                        component,
-                                        prop,
-                                        texture
-                                    );
-                                    await takeScreenshotForComponent(
-                                        pedType,
-                                        type,
-                                        component,
-                                        prop,
-                                        texture
-                                    );
-                                }
-                            } else {
-                                await LoadPropVariation(ped, component, prop);
-                                await takeScreenshotForComponent(
-                                    pedType,
-                                    type,
-                                    component,
-                                    prop
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            SetModelAsNoLongerNeeded(modelHash);
-            SetPlayerControl(playerId, true);
-            FreezeEntityPosition(ped, false);
-            clearInterval(interval);
-        }
-    }
-    SetPedOnGround();
-    startWeatherResource();
-    SendNUIMessage({
-        end: true,
-    });
-    DestroyAllCams(true);
-    DestroyCam(cam, true);
-    RenderScriptCams(false, false, 0, true, false, 0);
-    camInfo = null;
-    cam = null;
-});
-
-RegisterCommand("customscreenshot", async (source, args) => {
-    const type = args[2].toUpperCase();
-    const component = parseInt(args[0]);
-    let drawable =
-        args[1].toLowerCase() == "all"
-            ? args[1].toLowerCase()
-            : parseInt(args[1]);
-    let prop =
-        args[1].toLowerCase() == "all"
-            ? args[1].toLowerCase()
-            : parseInt(args[1]);
-    const gender = args[3].toLowerCase();
-    let cameraSettings;
-
-    let modelHashes;
-
-    if (gender == "male") {
-        modelHashes = [GetHashKey("mp_m_freemode_01")];
-    } else if (gender == "female") {
-        modelHashes = [GetHashKey("mp_f_freemode_01")];
-    } else {
-        modelHashes = [
-            GetHashKey("mp_m_freemode_01"),
-            GetHashKey("mp_f_freemode_01"),
-        ];
-    }
-
-    if (args[4] != null) {
-        let cameraSettings = "";
-        for (let i = 4; i < args.length; i++) {
-            cameraSettings += args[i] + " ";
-        }
-
-        cameraSettings = JSON.parse(cameraSettings);
-    }
-
-    if (!stopWeatherResource()) return;
-
-    DisableIdleCamera(true);
-
-    await Delay(100);
-
-    for (const modelHash of modelHashes) {
-        if (IsModelValid(modelHash)) {
-            if (!HasModelLoaded(modelHash)) {
-                RequestModel(modelHash);
-                while (!HasModelLoaded(modelHash)) {
-                    await Delay(100);
-                }
-            }
-
-            SetPlayerModel(playerId, modelHash);
-            await Delay(150);
-            SetModelAsNoLongerNeeded(modelHash);
-
-            await Delay(150);
-
-            ped = PlayerPedId();
-
-            interval = setInterval(() => {
-                ClearPedTasksImmediately(ped);
-            }, 1);
-
-            const pedType =
-                modelHash === GetHashKey("mp_m_freemode_01")
-                    ? "male"
-                    : "female";
-            SetEntityRotation(
-                ped,
-                config.greenScreenRotation.x,
-                config.greenScreenRotation.y,
-                config.greenScreenRotation.z,
-                0,
-                false
-            );
-            SetEntityCoordsNoOffset(
-                ped,
-                config.greenScreenPosition.x,
-                config.greenScreenPosition.y,
-                config.greenScreenPosition.z,
-                false,
-                false,
-                false
-            );
-            FreezeEntityPosition(ped, true);
-            await Delay(50);
-            SetPlayerControl(playerId, false);
-
-            ResetPedComponents();
-            await Delay(150);
-
-            if (drawable == "all") {
-                SendNUIMessage({
-                    start: true,
-                });
-                if (type === "CLOTHING") {
-                    const drawableVariationCount =
-                        GetNumberOfPedDrawableVariations(ped, component);
-                    for (
-                        drawable = 0;
-                        drawable < drawableVariationCount;
-                        drawable++
-                    ) {
-                        const textureVariationCount =
-                            GetNumberOfPedTextureVariations(
-                                ped,
-                                component,
-                                drawable
-                            );
-                        SendNUIMessage({
-                            type: config.cameraSettings[type][component].name,
-                            value: drawable,
-                            max: drawableVariationCount,
-                        });
-                        if (config.includeTextures) {
-                            for (
-                                let texture = 0;
-                                texture < textureVariationCount;
-                                texture++
-                            ) {
-                                await LoadComponentVariation(
-                                    ped,
-                                    component,
-                                    drawable,
-                                    texture
-                                );
-                                await takeScreenshotForComponent(
-                                    pedType,
-                                    type,
-                                    component,
-                                    drawable,
-                                    texture,
-                                    cameraSettings
-                                );
-                            }
-                        } else {
-                            await LoadComponentVariation(
-                                ped,
-                                component,
-                                drawable
-                            );
-                            await takeScreenshotForComponent(
-                                pedType,
-                                type,
-                                component,
-                                drawable,
-                                null,
-                                cameraSettings
-                            );
-                        }
-                    }
-                } else if (type === "PROPS") {
-                    const propVariationCount =
-                        GetNumberOfPedPropDrawableVariations(ped, component);
-                    for (prop = 0; prop < propVariationCount; prop++) {
-                        const textureVariationCount =
-                            GetNumberOfPedPropTextureVariations(
-                                ped,
-                                component,
-                                prop
-                            );
-                        SendNUIMessage({
-                            type: config.cameraSettings[type][component].name,
-                            value: prop,
-                            max: propVariationCount,
-                        });
-
-                        if (config.includeTextures) {
-                            for (
-                                let texture = 0;
-                                texture < textureVariationCount;
-                                texture++
-                            ) {
-                                await LoadPropVariation(
-                                    ped,
-                                    component,
-                                    prop,
-                                    texture
-                                );
-                                await takeScreenshotForComponent(
-                                    pedType,
-                                    type,
-                                    component,
-                                    prop,
-                                    texture,
-                                    cameraSettings
-                                );
-                            }
-                        } else {
-                            await LoadPropVariation(ped, component, prop);
-                            await takeScreenshotForComponent(
-                                pedType,
-                                type,
-                                component,
-                                prop,
-                                null,
-                                cameraSettings
-                            );
-                        }
-                    }
-                }
-            } else if (!isNaN(drawable)) {
-                if (type === "CLOTHING") {
-                    const textureVariationCount =
-                        GetNumberOfPedTextureVariations(
-                            ped,
-                            component,
-                            drawable
-                        );
-
-                    if (config.includeTextures) {
-                        for (
-                            let texture = 0;
-                            texture < textureVariationCount;
-                            texture++
-                        ) {
-                            await LoadComponentVariation(
-                                ped,
-                                component,
-                                drawable,
-                                texture
-                            );
-                            await takeScreenshotForComponent(
-                                pedType,
-                                type,
-                                component,
-                                drawable,
-                                texture,
-                                cameraSettings
-                            );
-                        }
-                    } else {
-                        await LoadComponentVariation(ped, component, drawable);
-                        await takeScreenshotForComponent(
-                            pedType,
-                            type,
-                            component,
-                            drawable,
-                            null,
-                            cameraSettings
-                        );
-                    }
-                } else if (type === "PROPS") {
-                    const textureVariationCount =
-                        GetNumberOfPedPropTextureVariations(
-                            ped,
-                            component,
-                            prop
-                        );
-
-                    if (config.includeTextures) {
-                        for (
-                            let texture = 0;
-                            texture < textureVariationCount;
-                            texture++
-                        ) {
-                            await LoadPropVariation(
-                                ped,
-                                component,
-                                prop,
-                                texture
-                            );
-                            await takeScreenshotForComponent(
-                                pedType,
-                                type,
-                                component,
-                                prop,
-                                texture,
-                                cameraSettings
-                            );
-                        }
-                    } else {
-                        await LoadPropVariation(ped, component, prop);
-                        await takeScreenshotForComponent(
-                            pedType,
-                            type,
-                            component,
-                            prop,
-                            null,
-                            cameraSettings
-                        );
-                    }
-                }
-            }
-            SetPlayerControl(playerId, true);
-            FreezeEntityPosition(ped, false);
-            clearInterval(interval);
-        }
-    }
-    SetPedOnGround();
-    startWeatherResource();
-    SendNUIMessage({
-        end: true,
-    });
-    DestroyAllCams(true);
-    DestroyCam(cam, true);
-    RenderScriptCams(false, false, 0, true, false, 0);
-    camInfo = null;
-    cam = null;
-});
-
-RegisterCommand("screenshotobject", async (source, args) => {
-    let modelHash = isNaN(Number(args[0]))
-        ? GetHashKey(args[0])
-        : Number(args[0]);
-    const ped = GetPlayerPed(-1);
-
-    if (IsWeaponValid(modelHash)) {
-        modelHash = GetWeapontypeModel(modelHash);
-    }
-
-    if (!stopWeatherResource()) return;
-
-    DisableIdleCamera(true);
-
-    await Delay(100);
-
-    if (IsModelValid(modelHash)) {
-        if (!HasModelLoaded(modelHash)) {
-            RequestModel(modelHash);
-            while (!HasModelLoaded(modelHash)) {
-                await Delay(100);
-            }
-        }
-    } else {
-        console.log("ERROR: Invalid object model");
-        return;
-    }
-
-    SetEntityCoords(
-        ped,
-        config.greenScreenHiddenSpot.x,
-        config.greenScreenHiddenSpot.y,
-        config.greenScreenHiddenSpot.z,
-        false,
-        false,
-        false
-    );
-
-    SetPlayerControl(playerId, false);
-
-    if (config.debug) console.log(`DEBUG: Spawning Object ${modelHash}`);
-
-    const object = CreateObjectNoOffset(
-        modelHash,
-        config.greenScreenPosition.x,
-        config.greenScreenPosition.y,
-        config.greenScreenPosition.z,
-        false,
-        true,
-        true
-    );
-
-    SetEntityRotation(
-        object,
-        config.greenScreenRotation.x,
-        config.greenScreenRotation.y,
-        config.greenScreenRotation.z,
-        0,
-        false
-    );
-
-    FreezeEntityPosition(object, true);
-
-    await Delay(50);
-
-    await takeScreenshotForObject(object, modelHash);
-
-    DeleteEntity(object);
-    SetPlayerControl(playerId, true);
-    SetModelAsNoLongerNeeded(modelHash);
-    startWeatherResource();
-    DestroyAllCams(true);
-    DestroyCam(cam, true);
-    RenderScriptCams(false, false, 0, true, false, 0);
-    cam = null;
-});
-
 RegisterCommand("screenshotvehicle", async (source, args) => {
-    const vehicles =
-        config.useQBVehicles && QBCore != null
-            ? Object.keys(QBCore.Shared.Vehicles)
-            : GetAllVehicleModels();
     const ped = PlayerPedId();
     const type = args[0].toLowerCase();
     const primarycolor = args[1] ? parseInt(args[1]) : null;
@@ -1020,7 +217,8 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
         SendNUIMessage({
             start: true,
         });
-        for (const vehicleModel of vehicles) {
+        for (let i = 0; i < vehicle_list.length; i++) {
+            const vehicleModel = vehicle_list[i].vehicle;
             const vehicleHash = GetHashKey(vehicleModel);
             if (!IsModelValid(vehicleHash)) continue;
 
@@ -1033,8 +231,8 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SendNUIMessage({
                 type: vehicleModel,
-                value: vehicles.indexOf(vehicleModel) + 1,
-                max: vehicles.length + 1,
+                value: i + 1,
+                max: vehicle_list.length,
             });
 
             const vehicle = await createGreenScreenVehicle(
@@ -1063,18 +261,114 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleWindowTint(vehicle, 1);
 
-            if (primarycolor)
-                SetVehicleColours(
-                    vehicle,
-                    primarycolor,
-                    secondarycolor || primarycolor
-                );
+            // Set all colors to ensure consistency
+            SetVehicleColours(vehicle, primarycolor || 0, 0); // Secondary always black
+            SetVehicleExtraColours(vehicle, 0, 0); // Pearlescent and wheel color to black
+            SetVehicleNeonLightsColour(vehicle, 0, 0, 0); // Neon lights off/black
+            SetVehicleNeonLightEnabled(vehicle, 0, false); // Disable all neon lights
+            SetVehicleNeonLightEnabled(vehicle, 1, false);
+            SetVehicleNeonLightEnabled(vehicle, 2, false);
+            SetVehicleNeonLightEnabled(vehicle, 3, false);
+            SetVehicleDirtLevel(vehicle, 0.0); // Clean vehicle, no dirt
+            SetVehicleDirtLevel(vehicle, 0.0); // Clean vehicle, no dirt
 
             await Delay(50);
 
-            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleModel);
+            await takeScreenshotForVehicle(
+                vehicle,
+                vehicleHash,
+                vehicleModel,
+                primarycolor || 0
+            );
 
             DeleteEntity(vehicle);
+            SetModelAsNoLongerNeeded(vehicleHash);
+        }
+        SendNUIMessage({
+            end: true,
+        });
+    } else if (type === "full") {
+        const totalOperations = vehicle_list.length * vehicle_colors.length;
+        let currentOperation = 0;
+
+        SendNUIMessage({
+            start: true,
+        });
+
+        for (let i = 0; i < vehicle_list.length; i++) {
+            const vehicleModel = vehicle_list[i].vehicle;
+            const vehicleHash = GetHashKey(vehicleModel);
+            if (!IsModelValid(vehicleHash)) {
+                currentOperation += vehicle_colors.length;
+                continue;
+            }
+
+            const vehicleClass = GetVehicleClassFromName(vehicleHash);
+
+            if (!config.includedVehicleClasses[vehicleClass]) {
+                SetModelAsNoLongerNeeded(vehicleHash);
+                currentOperation += vehicle_colors.length;
+                continue;
+            }
+
+            for (let j = 0; j < vehicle_colors.length; j++) {
+                const color_id = vehicle_colors[j].color_id;
+                currentOperation++;
+
+                SendNUIMessage({
+                    type: `${vehicleModel}_color_${color_id}`,
+                    value: currentOperation,
+                    max: totalOperations,
+                });
+
+                const vehicle = await createGreenScreenVehicle(
+                    vehicleHash,
+                    vehicleModel
+                );
+
+                if (vehicle === 0 || vehicle === null) {
+                    SetModelAsNoLongerNeeded(vehicleHash);
+                    console.log(
+                        `ERROR: Could not spawn vehicle. Broken Vehicle: ${vehicleModel}`
+                    );
+                    continue;
+                }
+
+                SetEntityRotation(
+                    vehicle,
+                    config.greenScreenVehicleRotation.x,
+                    config.greenScreenVehicleRotation.y,
+                    config.greenScreenVehicleRotation.z,
+                    0,
+                    false
+                );
+
+                FreezeEntityPosition(vehicle, true);
+
+                SetVehicleWindowTint(vehicle, 1);
+
+                // Set all colors to ensure consistency
+                SetVehicleColours(vehicle, color_id, 0); // Secondary always black
+                SetVehicleExtraColours(vehicle, 0, 0); // Pearlescent and wheel color to black
+                SetVehicleNeonLightsColour(vehicle, 0, 0, 0); // Neon lights off/black
+                SetVehicleNeonLightEnabled(vehicle, 0, false); // Disable all neon lights
+                SetVehicleNeonLightEnabled(vehicle, 1, false);
+                SetVehicleNeonLightEnabled(vehicle, 2, false);
+                SetVehicleNeonLightEnabled(vehicle, 3, false);
+                SetVehicleDirtLevel(vehicle, 0.0); // Clean vehicle, no dirt
+
+                await Delay(50);
+
+                await takeScreenshotForVehicle(
+                    vehicle,
+                    vehicleHash,
+                    vehicleModel,
+                    color_id
+                );
+
+                DeleteEntity(vehicle);
+            }
+
             SetModelAsNoLongerNeeded(vehicleHash);
         }
         SendNUIMessage({
@@ -1086,8 +380,8 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
         if (IsModelValid(vehicleHash)) {
             SendNUIMessage({
                 type: vehicleModel,
-                value: vehicles.indexOf(vehicleModel) + 1,
-                max: vehicles.length + 1,
+                value: 1,
+                max: 1,
             });
 
             const vehicle = await createGreenScreenVehicle(
@@ -1116,16 +410,23 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleWindowTint(vehicle, 1);
 
-            if (primarycolor)
-                SetVehicleColours(
-                    vehicle,
-                    primarycolor,
-                    secondarycolor || primarycolor
-                );
+            // Set all colors to ensure consistency
+            SetVehicleColours(vehicle, primarycolor || 0, 0); // Secondary always black
+            SetVehicleExtraColours(vehicle, 0, 0); // Pearlescent and wheel color to black
+            SetVehicleNeonLightsColour(vehicle, 0, 0, 0); // Neon lights off/black
+            SetVehicleNeonLightEnabled(vehicle, 0, false); // Disable all neon lights
+            SetVehicleNeonLightEnabled(vehicle, 1, false);
+            SetVehicleNeonLightEnabled(vehicle, 2, false);
+            SetVehicleNeonLightEnabled(vehicle, 3, false);
 
             await Delay(50);
 
-            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleModel);
+            await takeScreenshotForVehicle(
+                vehicle,
+                vehicleHash,
+                vehicleModel,
+                primarycolor || 0
+            );
 
             DeleteEntity(vehicle);
             SetModelAsNoLongerNeeded(vehicleHash);
@@ -1144,49 +445,12 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 setImmediate(() => {
     emit("chat:addSuggestions", [
         {
-            name: "/screenshot",
-            help: "generate clothing screenshots",
-        },
-        {
-            name: "/customscreenshot",
-            help: "generate custom cloting screenshots",
-            params: [
-                {
-                    name: "component",
-                    help: "The clothing component to take a screenshot of",
-                },
-                {
-                    name: "drawable/all",
-                    help: "The drawable variation to take a screenshot of",
-                },
-                { name: "props/clothing", help: "PROPS or CLOTHING" },
-                {
-                    name: "male/female/both",
-                    help: "The gender to take a screenshot of",
-                },
-                {
-                    name: "camera settings",
-                    help: "The camera settings to use for the screenshot (optional)",
-                },
-            ],
-        },
-        {
-            name: "/screenshotobject",
-            help: "generate object screenshots",
-            params: [
-                {
-                    name: "object",
-                    help: "The object hash to take a screenshot of",
-                },
-            ],
-        },
-        {
             name: "/screenshotvehicle",
             help: "generate vehicle screenshots",
             params: [
                 {
-                    name: "model/all",
-                    help: "The vehicle model or 'all' to take a screenshot of all vehicles",
+                    name: "model/all/full",
+                    help: "The vehicle model, 'all' to screenshot all vehicles, or 'full' to screenshot all vehicles with all color combinations",
                 },
                 {
                     name: "primarycolor",
@@ -1205,7 +469,5 @@ on("onResourceStop", (resName) => {
     if (GetCurrentResourceName() != resName) return;
 
     startWeatherResource();
-    clearInterval(interval);
     SetPlayerControl(playerId, true);
-    FreezeEntityPosition(ped, false);
 });

@@ -9,13 +9,19 @@ this_is_a_map 'yes'
 
 ui_page 'html/index.html'
 
+shared_scripts {
+    'vehicle_list.lua',
+}
 
 files {
     'config.json',
     'html/*'
 }
 
-client_script 'client.js'
+client_script {
+    'client.js',
+    'client.lua',
+}
 
 server_script 'server.js'
 
