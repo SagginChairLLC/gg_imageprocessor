@@ -1,54 +1,99 @@
 /// <reference types="@citizenfx/server" />
 /// <reference types="image-js" />
 
-const imagejs = require('image-js');
-const fs = require('fs');
+const imagejs = require("image-js");
+const fs = require("fs");
 
 const resName = GetCurrentResourceName();
 const mainSavePath = `resources/${resName}/images`;
 
 try {
-	if (!fs.existsSync(mainSavePath)) {
-		fs.mkdirSync(mainSavePath);
-	}
+    if (!fs.existsSync(mainSavePath)) {
+        fs.mkdirSync(mainSavePath);
+    }
 
-	onNet('takeScreenshot', async (filename, type) => {
-		const savePath = `${mainSavePath}/${type}`;
-		if (!fs.existsSync(savePath)) {
-			fs.mkdirSync(savePath);
-		}
-		exports['screenshot-basic'].requestClientScreenshot(
-			source,
-			{
-				fileName: savePath + '/' + filename + '.png',
-				encoding: 'png',
-				quality: 1.0,
-			},
-			async (err, fileName) => {
-				let image = await imagejs.Image.load(fileName);
-				const coppedImage = image.crop({ x: image.width / 4.5, width: image.height });
+    onNet("takeScreenshot", async (filename, type) => {
+        const savePath = `${mainSavePath}/${type}`;
+        if (!fs.existsSync(savePath)) {
+            fs.mkdirSync(savePath);
+        }
 
-				image.data = coppedImage.data;
-				image.width = coppedImage.width;
-				image.height = coppedImage.height;
+        exports["screenshot-basic"].requestClientScreenshot(
+            source,
+            {
+                fileName: savePath + "/" + filename + ".png",
+                encoding: "png",
+                quality: 1.0,
+            },
+            async (err, fileName) => {
+                let image = await imagejs.Image.load(fileName);
+                const { width, height } = image;
+                let minX = width,
+                    minY = height,
+                    maxX = 0,
+                    maxY = 0;
 
-				for (let x = 0; x < image.width; x++) {
-					for (let y = 0; y < image.height; y++) {
-						const pixelArr = image.getPixelXY(x, y);
-						const r = pixelArr[0];
-						const g = pixelArr[1];
-						const b = pixelArr[2];
+                // Detect vehicle bounds (exclude green/transparent background) with tolerance
+                const greenTolerance = 30;
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const [r, g, b] = image.getPixelXY(x, y);
 
-						if (g > r + b) {
-							image.setPixelXY(x, y, [255, 255, 255, 0]);
-						}
-					}
-				}
+                        // Relaxed green detection
+                        if (!(g > r + b + greenTolerance)) {
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
+                        }
+                    }
+                }
 
-				image.save(fileName);
-			}
-		);
-	});
+                console.log(`Original image: ${width}x${height}`);
+                console.log(
+                    `Crop bounds: minX=${minX}, maxX=${maxX}, width=${
+                        maxX - minX + 1
+                    }`
+                );
+                console.log(
+                    `Crop bounds: minY=${minY}, maxY=${maxY}, height=${
+                        maxY - minY + 1
+                    }`
+                );
+
+                // Safety check to avoid invalid crop
+                if (minX >= maxX || minY >= maxY) {
+                    console.warn("No vehicle pixels detected for:", fileName);
+                    return;
+                }
+
+                // Perform crop
+                const croppedImage = image.crop({
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX + 1,
+                    height: maxY - minY + 1,
+                });
+
+                console.log(
+                    `Cropped image size: ${croppedImage.width}x${croppedImage.height}`
+                );
+
+                // Convert green to transparent
+                for (let y = 0; y < croppedImage.height; y++) {
+                    for (let x = 0; x < croppedImage.width; x++) {
+                        const [r, g, b] = croppedImage.getPixelXY(x, y);
+                        if (g > r + b + greenTolerance) {
+                            croppedImage.setPixelXY(x, y, [255, 255, 255, 0]);
+                        }
+                    }
+                }
+
+                await croppedImage.save(fileName);
+                console.log("Saved:", fileName);
+            }
+        );
+    });
 } catch (error) {
-	console.error(error.message);
+    console.error(error.message);
 }
