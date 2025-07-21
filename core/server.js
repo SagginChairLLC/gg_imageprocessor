@@ -12,20 +12,8 @@ try {
         fs.mkdirSync(mainSavePath);
     }
 
-    onNet("takeScreenshot", async (filename, type, color) => {
-        let savePath = `${mainSavePath}/${type}`;
-        if (!fs.existsSync(savePath)) {
-            fs.mkdirSync(savePath);
-        }
-
-        if (typeof filename === "string") {
-            savePath = `${savePath}/${filename}`;
-            if (!fs.existsSync(savePath)) {
-                fs.mkdirSync(savePath);
-            }
-        }
-
-        const finalFilePath = `${savePath}/${color}.png`;
+    onNet("takeScreenshot", async (model) => {
+        const finalFilePath = `${mainSavePath}/${model}.png`;
 
         exports["screenshot-basic"].requestClientScreenshot(
             source,
@@ -42,7 +30,7 @@ try {
                     maxX = 0,
                     maxY = 0;
 
-                const greenTolerance = 30;
+                const greenTolerance = 100;
                 for (let y = 0; y < height; y++) {
                     for (let x = 0; x < width; x++) {
                         const [r, g, b] = image.getPixelXY(x, y);

@@ -10,19 +10,12 @@ let cam;
 const playerId = PlayerId();
 
 let vehicle_list = {};
-let vehicle_colors = {};
 
 onNet("receiveConfig", (config) => {
     vehicle_list = config.vehicles;
-    vehicle_colors = config.vehicle_colors;
 });
 
-async function takeScreenshotForVehicle(
-    vehicle,
-    hash,
-    model,
-    primaryColor = 0
-) {
+async function takeScreenshotForVehicle(vehicle, hash, model) {
     setWeatherTime();
 
     await Delay(500);
@@ -82,7 +75,7 @@ async function takeScreenshotForVehicle(
 
     await Delay(50);
 
-    emitNet("takeScreenshot", `${model}`, "vehicles", parseInt(primaryColor));
+    emitNet("takeScreenshot", `${model}`);
 
     await Delay(2000);
 
@@ -95,7 +88,7 @@ function setWeatherTime() {
     SetWeatherTypePersist("EXTRASUNNY");
     SetWeatherTypeNow("EXTRASUNNY");
     SetWeatherTypeNowPersist("EXTRASUNNY");
-    NetworkOverrideClockTime(18, 0, 0);
+    NetworkOverrideClockTime(12, 0, 0);
     NetworkOverrideClockMillisecondsPerGameMinute(1000000);
 }
 
@@ -153,7 +146,7 @@ function createGreenScreenVehicle(vehicleHash, vehicleModel) {
             console.log(`DEBUG: Spawning Vehicle ${vehicleModel}`);
         const timeout = setTimeout(() => {
             resolve(null);
-        }, config.vehicleSpawnTimeout);
+        }, 5000);
         if (!HasModelLoaded(vehicleHash)) {
             RequestModel(vehicleHash);
             while (!HasModelLoaded(vehicleHash)) {
@@ -181,8 +174,6 @@ function createGreenScreenVehicle(vehicleHash, vehicleModel) {
 RegisterCommand("screenshotvehicle", async (source, args) => {
     const ped = PlayerPedId();
     const type = args[0].toLowerCase();
-    const primarycolor = args[1] ? parseInt(args[1]) : null;
-    const secondarycolor = args[2] ? parseInt(args[2]) : null;
 
     if (!stopWeatherResource()) return;
 
@@ -199,9 +190,9 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
     SetPlayerControl(playerId, false);
 
     ClearAreaOfVehicles(
-        config.greenScreenPosition.x,
-        config.greenScreenPosition.y,
-        config.greenScreenPosition.z,
+        config.greenScreenVehiclePosition.x,
+        config.greenScreenVehiclePosition.y,
+        config.greenScreenVehiclePosition.z,
         10,
         false,
         false,
@@ -217,7 +208,8 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             start: true,
         });
         for (let i = 0; i < vehicle_list.length; i++) {
-            const vehicleModel = vehicle_list[i].vehicle;
+            const vehicleData = vehicle_list[i];
+            const vehicleModel = vehicleData.vehicle;
             const vehicleHash = GetHashKey(vehicleModel);
             if (!IsModelValid(vehicleHash)) continue;
 
@@ -260,114 +252,24 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleWindowTint(vehicle, 1);
 
-            // Set all colors to ensure consistency
-            SetVehicleColours(vehicle, primarycolor || 0, 0); // Secondary always black
-            SetVehicleExtraColours(vehicle, 0, 0); // Pearlescent and wheel color to black
-            SetVehicleNeonLightsColour(vehicle, 0, 0, 0); // Neon lights off/black
-            SetVehicleNeonLightEnabled(vehicle, 0, false); // Disable all neon lights
+            SetVehicleColours(
+                vehicle,
+                vehicleData.colors.primary,
+                vehicleData.colors.secondary
+            );
+            SetVehicleExtraColours(vehicle, 0, 0);
+            SetVehicleNeonLightsColour(vehicle, 0, 0, 0);
+            SetVehicleNeonLightEnabled(vehicle, 0, false);
             SetVehicleNeonLightEnabled(vehicle, 1, false);
             SetVehicleNeonLightEnabled(vehicle, 2, false);
             SetVehicleNeonLightEnabled(vehicle, 3, false);
-            SetVehicleDirtLevel(vehicle, 0.0); // Clean vehicle, no dirt
-            SetVehicleDirtLevel(vehicle, 0.0); // Clean vehicle, no dirt
+            SetVehicleDirtLevel(vehicle, 0.0);
 
             await Delay(50);
 
-            await takeScreenshotForVehicle(
-                vehicle,
-                vehicleHash,
-                vehicleModel,
-                primarycolor || 0
-            );
+            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleModel);
 
             DeleteEntity(vehicle);
-            SetModelAsNoLongerNeeded(vehicleHash);
-        }
-        SendNUIMessage({
-            end: true,
-        });
-    } else if (type === "full") {
-        const totalOperations = vehicle_list.length * vehicle_colors.length;
-        let currentOperation = 0;
-
-        SendNUIMessage({
-            start: true,
-        });
-
-        for (let i = 0; i < vehicle_list.length; i++) {
-            const vehicleModel = vehicle_list[i].vehicle;
-            const vehicleHash = GetHashKey(vehicleModel);
-            if (!IsModelValid(vehicleHash)) {
-                currentOperation += vehicle_colors.length;
-                continue;
-            }
-
-            const vehicleClass = GetVehicleClassFromName(vehicleHash);
-
-            if (!config.includedVehicleClasses[vehicleClass]) {
-                SetModelAsNoLongerNeeded(vehicleHash);
-                currentOperation += vehicle_colors.length;
-                continue;
-            }
-
-            for (let j = 0; j < vehicle_colors.length; j++) {
-                const color_id = vehicle_colors[j].color_id;
-                currentOperation++;
-
-                SendNUIMessage({
-                    type: `${vehicleModel}_color_${color_id}`,
-                    value: currentOperation,
-                    max: totalOperations,
-                });
-
-                const vehicle = await createGreenScreenVehicle(
-                    vehicleHash,
-                    vehicleModel
-                );
-
-                if (vehicle === 0 || vehicle === null) {
-                    SetModelAsNoLongerNeeded(vehicleHash);
-                    console.log(
-                        `ERROR: Could not spawn vehicle. Broken Vehicle: ${vehicleModel}`
-                    );
-                    continue;
-                }
-
-                SetEntityRotation(
-                    vehicle,
-                    config.greenScreenVehicleRotation.x,
-                    config.greenScreenVehicleRotation.y,
-                    config.greenScreenVehicleRotation.z,
-                    0,
-                    false
-                );
-
-                FreezeEntityPosition(vehicle, true);
-
-                SetVehicleWindowTint(vehicle, 1);
-
-                // Set all colors to ensure consistency
-                SetVehicleColours(vehicle, color_id, 0); // Secondary always black
-                SetVehicleExtraColours(vehicle, 0, 0); // Pearlescent and wheel color to black
-                SetVehicleNeonLightsColour(vehicle, 0, 0, 0); // Neon lights off/black
-                SetVehicleNeonLightEnabled(vehicle, 0, false); // Disable all neon lights
-                SetVehicleNeonLightEnabled(vehicle, 1, false);
-                SetVehicleNeonLightEnabled(vehicle, 2, false);
-                SetVehicleNeonLightEnabled(vehicle, 3, false);
-                SetVehicleDirtLevel(vehicle, 0.0); // Clean vehicle, no dirt
-
-                await Delay(50);
-
-                await takeScreenshotForVehicle(
-                    vehicle,
-                    vehicleHash,
-                    vehicleModel,
-                    color_id
-                );
-
-                DeleteEntity(vehicle);
-            }
-
             SetModelAsNoLongerNeeded(vehicleHash);
         }
         SendNUIMessage({
@@ -377,6 +279,19 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
         const vehicleModel = type;
         const vehicleHash = GetHashKey(vehicleModel);
         if (IsModelValid(vehicleHash)) {
+            const vehicleData = vehicle_list.find(
+                (v) => v.vehicle === vehicleModel
+            );
+
+            if (!vehicleData) {
+                console.log(
+                    `ERROR: Vehicle ${vehicleModel} not found in vehicle list`
+                );
+                SetPlayerControl(playerId, true);
+                startWeatherResource();
+                return;
+            }
+
             SendNUIMessage({
                 type: vehicleModel,
                 value: 1,
@@ -409,23 +324,21 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleWindowTint(vehicle, 1);
 
-            // Set all colors to ensure consistency
-            SetVehicleColours(vehicle, primarycolor || 0, 0); // Secondary always black
-            SetVehicleExtraColours(vehicle, 0, 0); // Pearlescent and wheel color to black
-            SetVehicleNeonLightsColour(vehicle, 0, 0, 0); // Neon lights off/black
-            SetVehicleNeonLightEnabled(vehicle, 0, false); // Disable all neon lights
+            SetVehicleColours(
+                vehicle,
+                vehicleData.colors.primary,
+                vehicleData.colors.secondary
+            );
+            SetVehicleExtraColours(vehicle, 0, 0);
+            SetVehicleNeonLightsColour(vehicle, 0, 0, 0);
+            SetVehicleNeonLightEnabled(vehicle, 0, false);
             SetVehicleNeonLightEnabled(vehicle, 1, false);
             SetVehicleNeonLightEnabled(vehicle, 2, false);
             SetVehicleNeonLightEnabled(vehicle, 3, false);
 
             await Delay(50);
 
-            await takeScreenshotForVehicle(
-                vehicle,
-                vehicleHash,
-                vehicleModel,
-                primarycolor || 0
-            );
+            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleModel);
 
             DeleteEntity(vehicle);
             SetModelAsNoLongerNeeded(vehicleHash);
@@ -448,16 +361,8 @@ setImmediate(() => {
             help: "generate vehicle screenshots",
             params: [
                 {
-                    name: "model/all/full",
-                    help: "The vehicle model, 'all' to screenshot all vehicles, or 'full' to screenshot all vehicles with all color combinations",
-                },
-                {
-                    name: "primarycolor",
-                    help: "The primary vehicle color to take a screenshot of (optional) See: https://wiki.rage.mp/index.php?title=Vehicle_Colors",
-                },
-                {
-                    name: "secondarycolor",
-                    help: "The secondary vehicle color to take a screenshot of (optional) See: https://wiki.rage.mp/index.php?title=Vehicle_Colors",
+                    name: "model/all",
+                    help: "The vehicle model or 'all' to screenshot all vehicles with their predefined colors",
                 },
             ],
         },

@@ -5,8 +5,6 @@ author 'Ben'
 description 'fivem-greenscreener'
 version '1.6.5'
 
-this_is_a_map 'yes'
-
 ui_page 'core/html/index.html'
 
 shared_scripts {
