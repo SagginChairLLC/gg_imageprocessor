@@ -1,7 +1,8 @@
 -- PASTE THE gg_boosting vehicle list directly in this file it will process all your active boosting vehicles.
-cfg = cfg or {}
+cfg = cfg or {} cfg.vehicles = cfg.vehicles or {}
 
-cfg.vehicle_classes = {
+
+cfg.vehicles.classes = {
     ["S"] = {
         payout = {min = 200, max = 500},
         class_timer = {min = 6, max = 12},    -- Hours
@@ -25,112 +26,113 @@ cfg.vehicle_classes = {
     ["D"] = {
         payout = {min = 200, max = 500},
         class_timer = {min = 6, max = 12},    -- Hours
-        
+
     },
 }
 
-cfg.vehicles = {
+cfg.vehicles.contracts = {
     {
         vehicle = 'adder',
         class = 'S',
-        colors = {primary = 28, secondary = 64},
+        color = {primary = 70, secondary = 111}, -- Metallic Orange / Lava Red
     },
     {
         vehicle = 't20',
         class = 'S',
-        colors = {primary = 3, secondary = 111},
+        color = {primary = 111, secondary = 135}, -- Lava Red / Midnight Blue
     },
     {
         vehicle = 'italirsx',
         class = 'S',
-        colors = {primary = 0, secondary = 120},
+        color = {primary = 64, secondary = 137}, -- Racing Blue / Wine Red
     },
     {
         vehicle = 'tyrant',
         class = 'S',
-        colors = {primary = 8, secondary = 8},
+        color = {primary = 138, secondary = 110}, -- Orange / Garnet Red
     },
     {
         vehicle = 'zentorno',
         class = 'A',
-        colors = {primary = 42, secondary = 0},
+        color = {primary = 89, secondary = 92}, -- Hot Pink / Salmon Pink
     },
     {
         vehicle = 'banshee2',
         class = 'A',
-        colors = {primary = 59, secondary = 3},
+        color = {primary = 86, secondary = 66}, -- Bright Purple / Galaxy Blue
     },
     {
         vehicle = 'comet6',
         class = 'A',
-        colors = {primary = 111, secondary = 111},
+        color = {primary = 39, secondary = 135}, -- Dark Green / Midnight Blue
     },
     {
         vehicle = 'locust',
         class = 'A',
-        colors = {primary = 27, secondary = 94},
+        color = {primary = 111, secondary = 28}, -- Lava Red / Taxi Yellow
     },
     {
         vehicle = 'drafter',
         class = 'B',
-        colors = {primary = 40, secondary = 41},
+        color = {primary = 0, secondary = 0}, -- Black / Black
     },
     {
         vehicle = 'futo',
         class = 'B',
-        colors = {primary = 0, secondary = 0},
+        color = {primary = 4, secondary = 4}, -- Silver / Silver
     },
     {
         vehicle = 'sentinelsg4',
         class = 'B',
-        colors = {primary = 13, secondary = 0},
+        color = {primary = 5, secondary = 5}, -- Blue / Blue
     },
     {
         vehicle = 'penumbra2',
         class = 'B',
-        colors = {primary = 88, secondary = 0},
+        color = {primary = 8, secondary = 8}, -- Olive Green / Olive Green
     },
     {
         vehicle = 'prairie',
         class = 'C',
-        colors = {primary = 29, secondary = 3},
+        color = {primary = 1, secondary = 1}, -- White / White
     },
     {
         vehicle = 'issi2',
         class = 'C',
-        colors = {primary = 112, secondary = 0},
+        color = {primary = 3, secondary = 3}, -- Cream / Cream
     },
     {
         vehicle = 'blista',
         class = 'C',
-        colors = {primary = 28, secondary = 12},
+        color = {primary = 2, secondary = 2}, -- Gray / Gray
     },
     {
         vehicle = 'asea',
         class = 'C',
-        colors = {primary = 15, secondary = 111},
+        color = {primary = 6, secondary = 6}, -- Dark Blue / Dark Blue
     },
     {
         vehicle = 'regina',
         class = 'D',
-        colors = {primary = 45, secondary = 20},
+        color = {primary = 0, secondary = 0}, -- Black / Black
     },
     {
         vehicle = 'stanier',
         class = 'D',
-        colors = {primary = 0, secondary = 0},
+        color = {primary = 2, secondary = 2}, -- Gray / Gray
     },
     {
         vehicle = 'intruder',
         class = 'D',
-        colors = {primary = 28, secondary = 4},
+        color = {primary = 3, secondary = 3}, -- Cream / Cream
     },
     {
         vehicle = 'emperor',
         class = 'D',
-        colors = {primary = 12, secondary = 28},
+        color = {primary = 1, secondary = 1}, -- White / White
     },
 }
+
 
 
 

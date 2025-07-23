@@ -11,8 +11,8 @@ const playerId = PlayerId();
 
 let vehicle_list = {};
 
-onNet("receiveConfig", (config) => {
-    vehicle_list = config.vehicles;
+onNet("receiveConfig", (c) => {
+    vehicle_list = c.contracts;
 });
 
 async function takeScreenshotForVehicle(vehicle, hash, model) {
@@ -207,6 +207,10 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
         SendNUIMessage({
             start: true,
         });
+
+        const totalVehicles = vehicle_list.length;
+        let currentVehicle = 0;
+
         for (let i = 0; i < vehicle_list.length; i++) {
             const vehicleData = vehicle_list[i];
             const vehicleModel = vehicleData.vehicle;
@@ -220,10 +224,12 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
                 continue;
             }
 
+            currentVehicle++;
+
             SendNUIMessage({
-                type: vehicleModel,
-                value: i + 1,
-                max: vehicle_list.length,
+                type: `${vehicleModel}`,
+                value: currentVehicle,
+                max: totalVehicles,
             });
 
             const vehicle = await createGreenScreenVehicle(
@@ -232,7 +238,6 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             );
 
             if (vehicle === 0 || vehicle === null) {
-                SetModelAsNoLongerNeeded(vehicleHash);
                 console.log(
                     `ERROR: Could not spawn vehicle. Broken Vehicle: ${vehicleModel}`
                 );
@@ -254,8 +259,8 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleColours(
                 vehicle,
-                vehicleData.colors.primary,
-                vehicleData.colors.secondary
+                vehicleData.color.primary,
+                vehicleData.color.secondary
             );
             SetVehicleExtraColours(vehicle, 0, 0);
             SetVehicleNeonLightsColour(vehicle, 0, 0, 0);
@@ -293,7 +298,7 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             }
 
             SendNUIMessage({
-                type: vehicleModel,
+                type: `${vehicleModel}`,
                 value: 1,
                 max: 1,
             });
@@ -304,10 +309,11 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             );
 
             if (vehicle === 0 || vehicle === null) {
-                SetModelAsNoLongerNeeded(vehicleHash);
                 console.log(
                     `ERROR: Could not spawn vehicle. Broken Vehicle: ${vehicleModel}`
                 );
+                SetPlayerControl(playerId, true);
+                startWeatherResource();
                 return;
             }
 
@@ -326,8 +332,8 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleColours(
                 vehicle,
-                vehicleData.colors.primary,
-                vehicleData.colors.secondary
+                vehicleData.color.primary,
+                vehicleData.color.secondary
             );
             SetVehicleExtraColours(vehicle, 0, 0);
             SetVehicleNeonLightsColour(vehicle, 0, 0, 0);

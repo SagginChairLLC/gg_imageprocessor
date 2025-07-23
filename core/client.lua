@@ -4,7 +4,7 @@
 
 while not cfg or not cfg.vehicles do Wait(100) end
 
-TriggerEvent('receiveConfig', cfg)
+TriggerEvent('receiveConfig', cfg.vehicles)
 
 print("VEHICLE FILE LOADED")
 
