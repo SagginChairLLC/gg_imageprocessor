@@ -12,10 +12,69 @@ const playerId = PlayerId();
 let vehicle_list = {};
 
 onNet("receiveConfig", (c) => {
-    vehicle_list = c.contracts;
+    vehicle_list = c;
 });
 
-async function takeScreenshotForVehicle(vehicle, hash, model) {
+function ApplyVehicleUpgrades(veh, conf) {
+    if (veh == 0 || !DoesEntityExist(veh) || typeof conf !== "object") return;
+    SetVehicleModKit(veh, 0);
+
+    if (conf.wheelType !== undefined) SetVehicleWheelType(veh, conf.wheelType);
+    if (conf.windowTint !== undefined)
+        SetVehicleWindowTint(veh, conf.windowTint);
+    if (conf.plateIndex !== undefined)
+        SetVehicleNumberPlateTextIndex(veh, conf.plateIndex);
+    if (conf.tyresCanBurst !== undefined)
+        SetVehicleTyresCanBurst(
+            veh,
+            conf.tyresCanBurst === true || conf.tyresCanBurst === 1
+        );
+
+    const modsSeq = conf.mods;
+    if (Array.isArray(modsSeq)) {
+        for (let i = 0; i <= 48; i++) {
+            const v = modsSeq[i];
+            if (typeof v === "number" && v >= 0) {
+                SetVehicleMod(veh, i, v, false);
+            } else {
+                RemoveVehicleMod(veh, i);
+            }
+        }
+        const liv = modsSeq[48];
+        if (typeof liv === "number" && liv >= 0) {
+            SetVehicleMod(veh, 48, liv, false);
+            const lc = GetVehicleLiveryCount(veh);
+            if (lc && lc > 0) SetVehicleLivery(veh, liv);
+        }
+    }
+
+    if (conf.wheels) {
+        if (conf.wheels[23] !== undefined)
+            SetVehicleMod(veh, 23, conf.wheels[23], conf.wheels.c23 === true);
+        if (conf.wheels[24] !== undefined)
+            SetVehicleMod(veh, 24, conf.wheels[24], conf.wheels.c24 === true);
+    }
+
+    if (conf.toggles) {
+        for (const [i, v] of Object.entries(conf.toggles)) {
+            if (v !== undefined)
+                ToggleVehicleMod(veh, parseInt(i), v === true || v === 1);
+        }
+    }
+
+    if (conf.extras) {
+        for (const [i, v] of Object.entries(conf.extras)) {
+            if (DoesExtraExist(veh, parseInt(i)))
+                SetVehicleExtra(
+                    veh,
+                    parseInt(i),
+                    v === true || v === 1 ? 0 : 1
+                );
+        }
+    }
+}
+
+async function takeScreenshotForVehicle(vehicle, hash, vehicleId) {
     setWeatherTime();
 
     await Delay(500);
@@ -75,7 +134,7 @@ async function takeScreenshotForVehicle(vehicle, hash, model) {
 
     await Delay(50);
 
-    emitNet("takeScreenshot", `${model}`);
+    emitNet("takeScreenshot", `${vehicleId}`);
 
     await Delay(2000);
 
@@ -175,6 +234,17 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
     const ped = PlayerPedId();
     const type = args[0].toLowerCase();
 
+    if (
+        !vehicle_list ||
+        typeof vehicle_list !== "object" ||
+        Object.keys(vehicle_list).length === 0
+    ) {
+        console.log(
+            "ERROR: Vehicle list not loaded. Make sure receiveConfig event has been triggered."
+        );
+        return;
+    }
+
     if (!stopWeatherResource()) return;
 
     DisableIdleCamera(true);
@@ -208,11 +278,13 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             start: true,
         });
 
-        const totalVehicles = vehicle_list.length;
+        const vehicleKeys = Object.keys(vehicle_list);
+        const totalVehicles = vehicleKeys.length;
         let currentVehicle = 0;
 
-        for (let i = 0; i < vehicle_list.length; i++) {
-            const vehicleData = vehicle_list[i];
+        for (let i = 0; i < vehicleKeys.length; i++) {
+            const vehicleKey = vehicleKeys[i];
+            const vehicleData = vehicle_list[vehicleKey];
             const vehicleModel = vehicleData.vehicle;
             const vehicleHash = GetHashKey(vehicleModel);
             if (!IsModelValid(vehicleHash)) continue;
@@ -257,11 +329,24 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleWindowTint(vehicle, 1);
 
-            SetVehicleColours(
-                vehicle,
-                vehicleData.color.primary,
-                vehicleData.color.secondary
-            );
+            if (vehicleData.color.primary.r !== undefined) {
+                SetVehicleCustomPrimaryColour(
+                    vehicle,
+                    vehicleData.color.primary.r,
+                    vehicleData.color.primary.g,
+                    vehicleData.color.primary.b
+                );
+            }
+
+            if (vehicleData.color.secondary.r !== undefined) {
+                SetVehicleCustomSecondaryColour(
+                    vehicle,
+                    vehicleData.color.secondary.r,
+                    vehicleData.color.secondary.g,
+                    vehicleData.color.secondary.b
+                );
+            }
+
             SetVehicleExtraColours(vehicle, 0, 0);
             SetVehicleNeonLightsColour(vehicle, 0, 0, 0);
             SetVehicleNeonLightEnabled(vehicle, 0, false);
@@ -270,9 +355,13 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             SetVehicleNeonLightEnabled(vehicle, 3, false);
             SetVehicleDirtLevel(vehicle, 0.0);
 
+            if (vehicleData.mods) {
+                ApplyVehicleUpgrades(vehicle, vehicleData.mods);
+            }
+
             await Delay(50);
 
-            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleModel);
+            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleKey);
 
             DeleteEntity(vehicle);
             SetModelAsNoLongerNeeded(vehicleHash);
@@ -284,9 +373,10 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
         const vehicleModel = type;
         const vehicleHash = GetHashKey(vehicleModel);
         if (IsModelValid(vehicleHash)) {
-            const vehicleData = vehicle_list.find(
-                (v) => v.vehicle === vehicleModel
+            const vehicleKey = Object.keys(vehicle_list).find(
+                (key) => vehicle_list[key].vehicle === vehicleModel
             );
+            const vehicleData = vehicleKey ? vehicle_list[vehicleKey] : null;
 
             if (!vehicleData) {
                 console.log(
@@ -330,11 +420,24 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
 
             SetVehicleWindowTint(vehicle, 1);
 
-            SetVehicleColours(
-                vehicle,
-                vehicleData.color.primary,
-                vehicleData.color.secondary
-            );
+            if (vehicleData.color.primary.r !== undefined) {
+                SetVehicleCustomPrimaryColour(
+                    vehicle,
+                    vehicleData.color.primary.r,
+                    vehicleData.color.primary.g,
+                    vehicleData.color.primary.b
+                );
+            }
+
+            if (vehicleData.color.secondary.r !== undefined) {
+                SetVehicleCustomSecondaryColour(
+                    vehicle,
+                    vehicleData.color.secondary.r,
+                    vehicleData.color.secondary.g,
+                    vehicleData.color.secondary.b
+                );
+            }
+
             SetVehicleExtraColours(vehicle, 0, 0);
             SetVehicleNeonLightsColour(vehicle, 0, 0, 0);
             SetVehicleNeonLightEnabled(vehicle, 0, false);
@@ -342,9 +445,13 @@ RegisterCommand("screenshotvehicle", async (source, args) => {
             SetVehicleNeonLightEnabled(vehicle, 2, false);
             SetVehicleNeonLightEnabled(vehicle, 3, false);
 
+            if (vehicleData.mods) {
+                ApplyVehicleUpgrades(vehicle, vehicleData.mods);
+            }
+
             await Delay(50);
 
-            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleModel);
+            await takeScreenshotForVehicle(vehicle, vehicleHash, vehicleKey);
 
             DeleteEntity(vehicle);
             SetModelAsNoLongerNeeded(vehicleHash);

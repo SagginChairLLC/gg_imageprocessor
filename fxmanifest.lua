@@ -7,9 +7,6 @@ version '1.6.5'
 
 ui_page 'core/html/index.html'
 
-shared_scripts {
-    'vehicle_list.lua',
-}
 
 files {
     'config.json',

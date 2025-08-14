@@ -1,13 +1,9 @@
--- local vehicleData = exports.gg_boosting:GetVehicleData()
 
--- print(vehicleData)
+while GetResourceState('gg_boosting') ~= 'started' do Wait(1000) end
 
-while not cfg or not cfg.vehicles do Wait(100) end
+local vehicleData = exports.gg_boosting:GetVehicleData()
 
-TriggerEvent('receiveConfig', cfg.vehicles)
-
-print("VEHICLE FILE LOADED")
-
+TriggerEvent('receiveConfig', vehicleData)
 
 local coords = vector3(-1079.86, -2413.8, 37.82)
 Citizen.CreateThread(function()
