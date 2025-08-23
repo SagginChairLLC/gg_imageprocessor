@@ -1,15 +1,12 @@
-fx_version 'cerulean'
-game 'gta5'
-
-author 'Ben'
-description 'fivem-greenscreener'
-version '1.6.5'
+fx_version 'cerulean' game 'gta5' author 'ggstudio' description 'gg_imageprocessor' version '1.0.0'
 
 ui_page 'core/html/index.html'
 
+shared_scripts {
+    '@ox_lib/init.lua',
+}
 
 files {
-    'config.json',
     'core/html/*'
 }
 
@@ -18,9 +15,16 @@ client_script {
     'core/client.lua',
 }
 
-server_script 'core/server.js'
+server_script {
+    'core/server.js',
+    'core/server.lua'
+}
 
 dependencies {
 	'screenshot-basic',
     'yarn'
+}
+
+provides {
+    'gg_imageprocessor'
 }
